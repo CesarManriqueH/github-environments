@@ -1,0 +1,68 @@
+name: Terraform deployer
+
+on:
+  workflow_call:
+    inputs:
+      tf_state_bucket:
+        description: Bucket where terraform state is stored
+        required: true
+        type: string
+      tf_state_region:
+        description: Region where bucket holding the terraform state is located
+        required: true
+        type: string
+      tf_workspace:
+        description: Terraform workspace
+        required: true
+        type: string
+      tf_target_dir:
+        description: Directory holding resource definitions
+        required: true
+        type: string
+      tf_vars:
+        description: Variables to pass to terraform apply
+        required: false
+        type: string
+    secrets:
+      aws_access_key_id:
+        required: true
+      aws_secret_access_key:
+        required: true
+
+jobs:
+  deployer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        run: .github/scripts/create-aws-creds-file.sh
+
+      - name: Provisioning Terraform state backend
+        run: |
+          aws s3api create-bucket --bucket ${{ inputs.tf_state_bucket }} --endpoint-url https://s3.${{ inputs.tf_state_region }}.amazonaws.com
+          aws s3api put-bucket-versioning --bucket ${{ inputs.tf_state_bucket }} --versioning-configuration Status=Enabled
+
+      - name: Preparing Terraform workspace
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/target"
+          cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules "${GITHUB_WORKSPACE}/target"
+
+      - uses: hashicorp/setup-terraform@v1.2.1
+        with:
+          terraform_version: 1.0.8
+
+      - name: Terraform init
+        working-directory: target
+        run: |
+          terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
+          terraform workspace new "${{ inputs.tf_workspace }}" || terraform workspace select "${{ inputs.tf_workspace }}"
+
+      - name: Terraform plan
+        working-directory: target
+        run: terraform plan -out=tfplan -input=false ${{ inputs.tf_state_bucket }}
+
+      - name: Terraform apply
+        working-directory: target
+        run: terraform apply -auto-approve tfplan

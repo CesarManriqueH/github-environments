@@ -1,0 +1,93 @@
+name: Continuous deployment 
+
+on:
+  push:
+    branches:
+      - main
+env:
+  ENV_NAME: dev
+  ENV_REGION: us-east-1
+  NAME_PREFIX: gh-envs
+  BASE_DOMAIN: cesarmanriqueh.com
+jobs:
+  deploy-base-infra:
+    uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
+    with:
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_region: us-east-1
+      tf_workspace: base-dev
+      tf_target_dir: infra/base
+      tf_vars: "-var 'region=${{ env.ENV_REGION }}' -var 'env_name=${{ env.ENV_NAME }}' -var 'base_domain=${{ env.BASE_DOMAIN }}'"
+    secrets:
+      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deploy-main-infra:
+    uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
+    with:
+      tf_state_bucket: gh-envs-tf-e
+      tf_state_region: us-east-1
+      tf_workspace: main-dev
+      tf_target_dir: infra/main
+      tf_vars: " -var 'region=${{ env.ENV_REGION }}' -var 'env_name=${{ env.ENV_NAME }}' -var 'name_prefix=${{ env.NAME_PREFIX }}' -var 'base_domain=${{ env.BASE_DOMAIN }}'"
+    secrets:
+      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    needs: deploy-base-infra
+
+  publish-web-app:
+    runs-on: ubuntu-20.04
+    env:
+      BUCKET_NAME: ${{ env.NAME_PREFIX }}-${{ env.ENV_NAME }}-web-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        run: .github/scripts/create-aws-creds-file.sh
+
+      - name: Lookup CF Dist ID
+        env:
+          ORIGIN_DOMAIN_NAME: "${{ env.BUCKET_NAME }}.s3.amazonaws.com"
+        run: |
+          CF_DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[].{Id: Id, OriginDomainName: Origins.Items[0].DomainName}[?contains(OriginDomainName, '${ORIGIN_DOMAIN_NAME}')] | [0].Id" \
+            --output text)
+          echo "💡 Cloudfront Distribution found with ID: ${CF_DIST_ID}"
+          echo "CF_DIST_ID=${CF_DIST_ID}" >> $GITHUB_ENV
+
+      - name: Setup Node JS
+        uses: actions/setup-node@v1
+        with:
+          node-version: "12.x"
+
+      - name: Install dependencies
+        working-directory: web-app
+        run: yarn
+
+      - name: Build and export
+        working-directory: web-app
+        run: yarn build && yarn export
+
+      - name: Push artifacts to s3
+        working-directory: web-app
+        run: |
+          aws s3 sync out s3://${BUCKET_NAME}/assets --delete --cache-control "max-age=900"
+          aws cloudfront create-invalidation --distribution-id ${CF_DIST_ID} --paths "/*"
+    needs: deploy-main-infra
+
+  smoke-test:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Confirm web page loads
+        run: |
+          url=https://web-app.${{ env.ENV_NAME }}.${{ env.BASE_DOMAIN }}
+          response=$(curl --write-out '%{http_code}' --silent --output /dev/null $url)
+          if [[ $response != "200" ]]; then
+            echo "Expected 200 from $url but got $response"
+            exit 1
+          fi
+    needs: publish-web-app
