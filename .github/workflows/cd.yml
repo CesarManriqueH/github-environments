@@ -1,4 +1,4 @@
-name: Continuous deployment 
+name: Continuous deployment
 
 on:
   push:
@@ -7,38 +7,57 @@ on:
 env:
   ENV_NAME: dev
   ENV_REGION: us-east-1
-  NAME_PREFIX: gh-envs
   BASE_DOMAIN: cesarmanriqueh.com
+  NAME_PREFIX: gh-envs
+
 jobs:
+  set-env:
+    runs-on: ubuntu-20.04
+    outputs:
+      env_name: ${{ steps.set-env.outputs.env_name }}
+      region: ${{ steps.set-env.outputs.region }}
+      base_domain: ${{ steps.set-env.outputs.base_domain }}
+      name_prefix: ${{ steps.set-env.outputs.name_prefix }}
+    steps:
+      - name: Configure AWS credentials
+        id: set-env
+        run: |
+          echo "::set-output name=env_name::dev"
+          echo "::set-output name=region::us-east-1"
+          echo "::set-output name=base_domain::cesarmanriqueh.com"
+          echo "::set-output name=name_prefix::gh-envs"
+
   deploy-base-infra:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
       tf_state_bucket: gh-envs-tf-state
-      tf_state_region: us-east-1
+      tf_state_region: ${{ needs.set-env.outputs.region }}
       tf_workspace: base-dev
       tf_target_dir: infra/base
-      tf_vars: "-var 'region=${{ env.ENV_REGION }}' -var 'env_name=${{ env.ENV_NAME }}' -var 'base_domain=${{ env.BASE_DOMAIN }}'"
+      tf_vars: "-var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
     secrets:
       aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    needs: set-env
 
   deploy-main-infra:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
-      tf_state_bucket: gh-envs-tf-e
-      tf_state_region: us-east-1
+      tf_state_bucket: gh-envs-tf-states
+      tf_state_region: ${{ needs.set-environment.outputs.region }}
       tf_workspace: main-dev
       tf_target_dir: infra/main
-      tf_vars: " -var 'region=${{ env.ENV_REGION }}' -var 'env_name=${{ env.ENV_NAME }}' -var 'name_prefix=${{ env.NAME_PREFIX }}' -var 'base_domain=${{ env.BASE_DOMAIN }}'"
+      tf_vars: " -var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'name_prefix=${{ needs.set-env.outputs.name_prefix }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
     secrets:
       aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    needs: deploy-base-infra
+    needs: [set-env,deploy-base-infra]
 
   publish-web-app:
     runs-on: ubuntu-20.04
     env:
-      BUCKET_NAME: ${{ env.NAME_PREFIX }}-${{ env.ENV_NAME }}-web-app
+      BUCKET_NAME: '${{ needs.set-env.outputs.name_prefix }}-${{ needs.set-env.outputs.env_name }}-web-app'
+      DOMAIN: 'web-app.${{ needs.set-env.outputs.env_name }}.${{ needs.set-env.outputs.base_domain }}'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -74,7 +93,7 @@ jobs:
         run: |
           aws s3 sync out s3://${BUCKET_NAME}/assets --delete --cache-control "max-age=900"
           aws cloudfront create-invalidation --distribution-id ${CF_DIST_ID} --paths "/*"
-    needs: deploy-main-infra
+    needs: [set-env,deploy-main-infra]
 
   smoke-test:
     runs-on: ubuntu-20.04
@@ -84,10 +103,10 @@ jobs:
 
       - name: Confirm web page loads
         run: |
-          url=https://web-app.${{ env.ENV_NAME }}.${{ env.BASE_DOMAIN }}
+          url=https://${DOMAIN}
           response=$(curl --write-out '%{http_code}' --silent --output /dev/null $url)
           if [[ $response != "200" ]]; then
             echo "Expected 200 from $url but got $response"
             exit 1
           fi
-    needs: publish-web-app
+    needs: [set-env,publish-web-app]
