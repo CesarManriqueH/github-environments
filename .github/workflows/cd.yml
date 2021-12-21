@@ -13,6 +13,7 @@ jobs:
   set-env:
     runs-on: ubuntu-20.04
     outputs:
+      aws_role_to_assume: ${{ steps.set-env.outputs.aws_role_to_assume }}
       env_name: ${{ steps.set-env.outputs.env_name }}
       region: ${{ steps.set-env.outputs.region }}
       base_domain: ${{ steps.set-env.outputs.base_domain }}
@@ -21,6 +22,7 @@ jobs:
       - name: Set job level environment
         id: set-env
         run: |
+          echo "::set-output name=aws_role_to_assume::arn:aws:iam::168846058973:role/gh-workflow-role"
           echo "::set-output name=env_name::dev"
           echo "::set-output name=region::us-east-1"
           echo "::set-output name=base_domain::cesarmanriqueh.com"
@@ -29,27 +31,23 @@ jobs:
   deploy-base-infra:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
+      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_bucket: gh-envs-tf-state
       tf_state_region: ${{ needs.set-env.outputs.region }}
       tf_workspace: base-dev
       tf_target_dir: infra/base
       tf_vars: "-var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
-    secrets:
-      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     needs: set-env
 
   deploy-main-infra:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
+      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_bucket: gh-envs-tf-state
       tf_state_region: ${{ needs.set-env.outputs.region }}
       tf_workspace: main-dev
       tf_target_dir: infra/main
-      tf_vars: " -var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'name_prefix=${{ needs.set-env.outputs.name_prefix }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
-    secrets:
-      aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      tf_vars: "-var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'name_prefix=${{ needs.set-env.outputs.name_prefix }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
     needs: [set-env,deploy-base-infra]
 
   publish-web-app:
@@ -64,7 +62,7 @@ jobs:
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@master
         with:
-          role-to-assume: 'arn:aws:iam::168846058973:role/gh-workflow-role'
+          role-to-assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
           aws-region: ${{ needs.set-env.outputs.region }}
 
       - name: Lookup CF Dist ID

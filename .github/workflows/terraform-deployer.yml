@@ -3,6 +3,10 @@ name: Terraform deployer
 on:
   workflow_call:
     inputs:
+      aws_role_to_assume:
+        description: Role to assume and deploy resources to aws
+        required: true
+        type: string
       tf_state_bucket:
         description: Bucket where terraform state is stored
         required: true
@@ -23,11 +27,6 @@ on:
         description: Variables to pass to terraform apply
         required: false
         type: string
-    secrets:
-      aws_access_key_id:
-        required: true
-      aws_secret_access_key:
-        required: true
 
 permissions:
   id-token: write
@@ -43,18 +42,20 @@ jobs:
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@master
         with:
-          role-to-assume: 'arn:aws:iam::168846058973:role/gh-workflow-role'
+          role-to-assume: ${{ inputs.aws_role_to_assume }}
           aws-region: ${{ inputs.tf_state_region }}
 
       - name: Provisioning Terraform state backend
         run: |
-          aws s3api create-bucket --bucket ${{ inputs.tf_state_bucket }} --endpoint-url https://s3.${{ inputs.tf_state_region }}.amazonaws.com
-          aws s3api put-bucket-versioning --bucket ${{ inputs.tf_state_bucket }} --versioning-configuration Status=Enabled
+          aws s3api create-bucket --bucket ${{ inputs.tf_state_bucket }} \
+            --endpoint-url https://s3.${{ inputs.tf_state_region }}.amazonaws.com
+          aws s3api put-bucket-versioning --bucket ${{ inputs.tf_state_bucket }} \
+            --versioning-configuration Status=Enabled
 
       - name: Preparing Terraform workspace
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/target"
-          cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules "${GITHUB_WORKSPACE}/target"
+          cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules ${GITHUB_WORKSPACE}/target
 
       - uses: hashicorp/setup-terraform@v1.2.1
         with:
