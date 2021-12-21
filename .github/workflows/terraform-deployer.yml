@@ -24,7 +24,7 @@ on:
         required: true
         type: string
       tf_vars:
-        description: Variables to pass to terraform apply
+        description: Content of auto.tfvars file to load on terraform plan
         required: false
         type: string
 
@@ -71,7 +71,11 @@ jobs:
 
       - name: Terraform plan
         working-directory: target
-        run: terraform plan -out=tfplan -input=false ${{ inputs.tf_vars }}
+        run: |
+          cat <<EOF > tf_vars.auto.tfvars
+          ${{ inputs.tf_vars }}
+          EOF
+          terraform plan -out=tfplan -input=false
 
       - name: Terraform apply
         working-directory: target
