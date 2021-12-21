@@ -29,6 +29,10 @@ on:
       aws_secret_access_key:
         required: true
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   deployer:
     runs-on: ubuntu-latest
@@ -36,8 +40,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Configure AWS credentials
-        run: .github/scripts/create-aws-creds-file.sh
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: 'arn:aws:iam::168846058973:role/gh-workflow-role'
+          aws-region: ${{ inputs.tf_state_region }}
 
       - name: Provisioning Terraform state backend
         run: |
