@@ -28,10 +28,6 @@ on:
         required: false
         type: string
 
-permissions:
-  id-token: write
-  contents: write
-
 jobs:
   deployer:
     runs-on: ubuntu-latest
