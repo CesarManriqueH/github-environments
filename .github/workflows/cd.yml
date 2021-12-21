@@ -4,11 +4,10 @@ on:
   push:
     branches:
       - main
-env:
-  ENV_NAME: dev
-  ENV_REGION: us-east-1
-  BASE_DOMAIN: cesarmanriqueh.com
-  NAME_PREFIX: gh-envs
+
+permissions:
+  id-token: write
+  contents: write
 
 jobs:
   set-env:
@@ -62,8 +61,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Configure AWS credentials
-        run: .github/scripts/create-aws-creds-file.sh
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: 'arn:aws:iam::168846058973:role/gh-workflow-role'
+          aws-region: ${{ needs.set-env.outputs.region }}
 
       - name: Lookup CF Dist ID
         env:
