@@ -99,6 +99,8 @@ jobs:
 
   smoke-test:
     runs-on: ubuntu-20.04
+    env:
+      DOMAIN: 'web-app.${{ needs.set-env.outputs.env_name }}.${{ needs.set-env.outputs.base_domain }}'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
