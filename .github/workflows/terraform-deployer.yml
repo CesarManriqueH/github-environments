@@ -63,12 +63,14 @@ jobs:
       - name: Terraform init
         working-directory: target
         run: |
-          terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
+          terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}" \
+            -backend-config="region=${{ inputs.tf_state_region }}" \
+            -backend-config="key=${{ inputs.tf_workspace }}.json"
           terraform workspace new "${{ inputs.tf_workspace }}" || terraform workspace select "${{ inputs.tf_workspace }}"
 
       - name: Terraform plan
         working-directory: target
-        run: terraform plan -out=tfplan -input=false ${{ inputs.tf_state_bucket }}
+        run: terraform plan -out=tfplan -input=false ${{ inputs.tf_vars }}
 
       - name: Terraform apply
         working-directory: target

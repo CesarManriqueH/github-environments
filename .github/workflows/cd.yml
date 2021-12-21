@@ -43,8 +43,8 @@ jobs:
   deploy-main-infra:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
-      tf_state_bucket: gh-envs-tf-states
-      tf_state_region: ${{ needs.set-environment.outputs.region }}
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_region: ${{ needs.set-env.outputs.region }}
       tf_workspace: main-dev
       tf_target_dir: infra/main
       tf_vars: " -var 'env_name=${{ needs.set-env.outputs.env_name }}' -var 'region=${{ needs.set-env.outputs.region }}' -var 'name_prefix=${{ needs.set-env.outputs.name_prefix }}' -var 'base_domain=${{ needs.set-env.outputs.base_domain }}'"
