@@ -9,7 +9,6 @@ terraform {
   }
 
   backend "s3" {
-    encrypt        = true
-    dynamodb_table = "terraform-state-lock-multi-project"
+    encrypt = true
   }
 }

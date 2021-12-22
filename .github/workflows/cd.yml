@@ -32,8 +32,9 @@ jobs:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
-      tf_state_bucket: gh-envs-tf-state
       tf_state_region: ${{ needs.set-env.outputs.region }}
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_dynamodb_table: gh-envs-tf-lock
       tf_workspace: base-dev
       tf_target_dir: infra/base
       tf_vars: |
@@ -46,8 +47,9 @@ jobs:
     uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
-      tf_state_bucket: gh-envs-tf-state
       tf_state_region: ${{ needs.set-env.outputs.region }}
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_dynamodb_table: gh-envs-tf-lock
       tf_workspace: main-dev
       tf_target_dir: infra/main
       tf_vars: |
