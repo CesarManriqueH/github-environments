@@ -108,6 +108,12 @@ jobs:
         working-directory: web-app
         run: yarn build && yarn export
 
+      - name: Push artifact to github
+        uses: actions/upload-artifact@v2
+        with:
+          name: web-app
+          path: web-app/out
+
       - name: Push artifacts to s3
         working-directory: web-app
         run: |
