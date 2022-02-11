@@ -126,9 +126,6 @@ jobs:
     env:
       DOMAIN: 'web-app.${{ needs.set-env.outputs.env_name }}.${{ needs.set-env.outputs.base_domain }}'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
       - name: Confirm web page loads
         run: |
           url=https://${DOMAIN}
