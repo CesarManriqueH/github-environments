@@ -77,7 +77,7 @@ jobs:
             -backend-config="bucket=${{ inputs.tf_state_bucket }}" \
             -backend-config="key=${{ inputs.tf_workspace }}.json" \
             -backend-config="dynamodb_table=${{ inputs.tf_state_dynamodb_table }}"
-          terraform workspace new "${{ inputs.tf_workspace }}" || terraform workspace select "${{ inputs.tf_workspace }}"
+          terraform workspace new "${{ inputs.tf_workspace }}" &> /dev/null || terraform workspace select "${{ inputs.tf_workspace }}"
 
       - name: Terraform plan
         working-directory: target
