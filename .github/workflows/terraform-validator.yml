@@ -1,4 +1,4 @@
-name: Terraform deployer
+name: Terraform validator
 
 on:
   workflow_call:
@@ -70,6 +70,9 @@ jobs:
         with:
           terraform_version: 1.0.8
 
+      - name: Terraform fmt
+        run: terraform fmt -check
+
       - name: Terraform init
         working-directory: target
         run: |
@@ -79,14 +82,14 @@ jobs:
             -backend-config="dynamodb_table=${{ inputs.tf_state_dynamodb_table }}"
           terraform workspace new "${{ inputs.tf_workspace }}" &> /dev/null || terraform workspace select "${{ inputs.tf_workspace }}"
 
+      - name: Terraform validate
+        working-directory: target
+        run: terraform validate
+
       - name: Terraform plan
         working-directory: target
         run: |
           cat <<EOF > tf_vars.auto.tfvars
           ${{ inputs.tf_vars }}
           EOF
-          terraform plan -out=tfplan -input=false
-
-      - name: Terraform apply
-        working-directory: target
-        run: terraform apply -auto-approve tfplan
+          terraform plan -out=tfplan -input=false -lock=false

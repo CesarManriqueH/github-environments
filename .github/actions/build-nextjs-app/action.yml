@@ -1,0 +1,36 @@
+name: Build NextJs app
+
+inputs:
+  path:
+    description: Directory with source code
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node JS
+      uses: actions/setup-node@v1
+      with:
+        node-version: "12.x"
+
+    - name: Get yarn cache directory path
+      id: yarn-cache-dir-path
+      shell: bash
+      run: echo "::set-output name=dir::$(yarn cache dir)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-
+
+    - name: Install dependencies
+      working-directory: ${{ inputs.path }}
+      shell: bash
+      run: yarn
+
+    - name: Build and export
+      working-directory: ${{ inputs.path }}
+      shell: bash
+      run: yarn build && yarn export

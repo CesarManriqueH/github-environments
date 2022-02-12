@@ -1,0 +1,65 @@
+name: PR checks
+
+on:
+  pull_request:
+
+jobs:
+  set-env:
+    runs-on: ubuntu-20.04
+    outputs:
+      aws_role_to_assume: ${{ steps.set-env.outputs.aws_role_to_assume }}
+      env_name: ${{ steps.set-env.outputs.env_name }}
+      region: ${{ steps.set-env.outputs.region }}
+      base_domain: ${{ steps.set-env.outputs.base_domain }}
+      name_prefix: ${{ steps.set-env.outputs.name_prefix }}
+    steps:
+      - name: Set job level environment
+        id: set-env
+        run: |
+          echo "::set-output name=aws_role_to_assume::arn:aws:iam::168846058973:role/gh-workflow-role"
+          echo "::set-output name=env_name::dev"
+          echo "::set-output name=region::us-east-1"
+          echo "::set-output name=base_domain::cesarmanriqueh.com"
+          echo "::set-output name=name_prefix::gh-envs"
+
+  validate-base-infra:
+    uses: CesarManriqueH/github-environments/.github/workflows/terraform-validator.yml@main
+    with:
+      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
+      tf_state_region: ${{ needs.set-env.outputs.region }}
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_dynamodb_table: gh-envs-tf-lock
+      tf_workspace: base-dev
+      tf_target_dir: infra/base
+      tf_vars: |
+        env_name = "${{ needs.set-env.outputs.env_name }}"
+        region = "${{ needs.set-env.outputs.region }}"
+        base_domain = "${{ needs.set-env.outputs.base_domain }}"
+    needs: [set-env]
+
+  validate-main-infra:
+    uses: CesarManriqueH/github-environments/.github/workflows/terraform-validator.yml@main
+    with:
+      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
+      tf_state_region: ${{ needs.set-env.outputs.region }}
+      tf_state_bucket: gh-envs-tf-state
+      tf_state_dynamodb_table: gh-envs-tf-lock
+      tf_workspace: main-dev
+      tf_target_dir: infra/main
+      tf_vars: |
+        env_name = "${{ needs.set-env.outputs.env_name }}"
+        region = "${{ needs.set-env.outputs.region }}"
+        name_prefix = "${{ needs.set-env.outputs.name_prefix }}"
+        base_domain = "${{ needs.set-env.outputs.base_domain }}"
+    needs: [set-env]
+
+  validate-web-app:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build app
+        uses: ./.github/actions/build-nextjs-app
+        with:
+          path: web-app

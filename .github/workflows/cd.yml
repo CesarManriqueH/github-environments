@@ -68,41 +68,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Configure aws credentials
-        uses: aws-actions/configure-aws-credentials@master
+      - name: Build app
+        uses: ./.github/actions/build-nextjs-app
         with:
-          role-to-assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
-          aws-region: ${{ needs.set-env.outputs.region }}
-
-      - name: Setup Node JS
-        uses: actions/setup-node@v1
-        with:
-          node-version: "12.x"
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-
-      - uses: actions/cache@v2
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install dependencies
-        working-directory: web-app
-        run: yarn
-
-      - name: Build and export
-        working-directory: web-app
-        run: yarn build && yarn export
+          path: web-app
 
       - name: Push artifact to github
         uses: actions/upload-artifact@v2
         with:
           name: web-app
           path: web-app/out
+
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
+          aws-region: ${{ needs.set-env.outputs.region }}
 
       - name: Lookup CF Dist ID
         env:
