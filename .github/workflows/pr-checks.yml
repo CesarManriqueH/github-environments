@@ -3,6 +3,10 @@ name: PR checks
 on:
   pull_request:
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   set-env:
     runs-on: ubuntu-20.04
