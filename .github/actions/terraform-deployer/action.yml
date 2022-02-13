@@ -1,0 +1,91 @@
+name: Terraform deployer
+
+inputs:
+  aws_role_to_assume:
+    description: Role to assume and deploy resources to aws
+    required: true
+    type: string
+  tf_state_region:
+    description: Region where bucket holding the terraform state is located
+    required: true
+    type: string
+  tf_state_bucket:
+    description: Bucket where to store terraform state
+    required: true
+    type: string
+  tf_state_dynamodb_table:
+    description: Name of DynamoDB Table to use for state locking and consistency
+    required: true
+    type: string
+  tf_workspace:
+    description: Terraform workspace
+    required: true
+    type: string
+  tf_target_dir:
+    description: Directory holding resource definitions
+    required: true
+    type: string
+  tf_vars:
+    description: Content of auto.tfvars file to load on terraform plan
+    required: false
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Configure aws credentials
+      uses: aws-actions/configure-aws-credentials@master
+      with:
+        role-to-assume: ${{ inputs.aws_role_to_assume }}
+        aws-region: ${{ inputs.tf_state_region }}
+
+    - name: Provisioning Terraform state backend
+      shell: bash
+      run: |
+        aws s3api create-bucket --bucket ${{ inputs.tf_state_bucket }} \
+          --endpoint-url https://s3.${{ inputs.tf_state_region }}.amazonaws.com
+        aws s3api put-bucket-versioning --bucket ${{ inputs.tf_state_bucket }} \
+          --versioning-configuration Status=Enabled
+        aws s3api put-public-access-block \
+          --bucket ${{ inputs.tf_state_bucket }} \
+          --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+        aws dynamodb create-table \
+          --table-name ${{ inputs.tf_state_dynamodb_table }} \
+          --attribute-definitions AttributeName=LockID,AttributeType=S \
+          --key-schema AttributeName=LockID,KeyType=HASH \
+          --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 || true
+
+    - name: Preparing Terraform workspace
+      shell: bash
+      run: |
+        mkdir -p "${GITHUB_WORKSPACE}/target"
+        cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules ${GITHUB_WORKSPACE}/target
+
+    - uses: hashicorp/setup-terraform@v1.2.1
+      with:
+        terraform_version: 1.0.8
+
+    - name: Terraform init
+      working-directory: target
+      shell: bash
+      run: |
+        terraform init -backend-config="region=${{ inputs.tf_state_region }}" \
+          -backend-config="bucket=${{ inputs.tf_state_bucket }}" \
+          -backend-config="key=${{ inputs.tf_workspace }}.json" \
+          -backend-config="dynamodb_table=${{ inputs.tf_state_dynamodb_table }}"
+        terraform workspace new "${{ inputs.tf_workspace }}" &> /dev/null || terraform workspace select "${{ inputs.tf_workspace }}"
+
+    - name: Terraform plan
+      working-directory: target
+      shell: bash
+      run: |
+        cat <<EOF > tf_vars.auto.tfvars
+        ${{ inputs.tf_vars }}
+        EOF
+        terraform plan -out=tfplan -input=false
+
+    - name: Terraform apply
+      working-directory: target
+      shell: bash
+      run: terraform apply -auto-approve tfplan
