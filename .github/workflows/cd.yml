@@ -29,34 +29,46 @@ jobs:
           echo "::set-output name=name_prefix::gh-envs"
 
   deploy-base-infra:
-    uses: ./.github/workflows/terraform-deployer.yml
-    with:
-      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
-      tf_state_region: ${{ needs.set-env.outputs.region }}
-      tf_state_bucket: gh-envs-tf-state
-      tf_state_dynamodb_table: gh-envs-tf-lock
-      tf_workspace: base-dev
-      tf_target_dir: infra/base
-      tf_vars: |
-        env_name = "${{ needs.set-env.outputs.env_name }}"
-        region = "${{ needs.set-env.outputs.region }}"
-        base_domain = "${{ needs.set-env.outputs.base_domain }}"
-    needs: set-env
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Deploy terraform
+        uses: ./.github/actions/terraform-deployer
+        with:
+          aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
+          tf_state_region: ${{ needs.set-env.outputs.region }}
+          tf_state_bucket: gh-envs-tf-state
+          tf_state_dynamodb_table: gh-envs-tf-lock
+          tf_workspace: base-dev
+          tf_target_dir: infra/base
+          tf_vars: |
+            env_name = "${{ needs.set-env.outputs.env_name }}"
+            region = "${{ needs.set-env.outputs.region }}"
+            base_domain = "${{ needs.set-env.outputs.base_domain }}"
+    needs: [set-env]
 
   deploy-main-infra:
-    uses: ./.github/workflows/terraform-deployer.yml
-    with:
-      aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
-      tf_state_region: ${{ needs.set-env.outputs.region }}
-      tf_state_bucket: gh-envs-tf-state
-      tf_state_dynamodb_table: gh-envs-tf-lock
-      tf_workspace: main-dev
-      tf_target_dir: infra/main
-      tf_vars: |
-        env_name = "${{ needs.set-env.outputs.env_name }}"
-        region = "${{ needs.set-env.outputs.region }}"
-        name_prefix = "${{ needs.set-env.outputs.name_prefix }}"
-        base_domain = "${{ needs.set-env.outputs.base_domain }}"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Deploy terraform
+        uses: ./.github/actions/terraform-deployer
+        with:
+          aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
+          tf_state_region: ${{ needs.set-env.outputs.region }}
+          tf_state_bucket: gh-envs-tf-state
+          tf_state_dynamodb_table: gh-envs-tf-lock
+          tf_workspace: main-dev
+          tf_target_dir: infra/main
+          tf_vars: |
+            env_name = "${{ needs.set-env.outputs.env_name }}"
+            region = "${{ needs.set-env.outputs.region }}"
+            name_prefix = "${{ needs.set-env.outputs.name_prefix }}"
+            base_domain = "${{ needs.set-env.outputs.base_domain }}"
     needs: [set-env,deploy-base-infra]
 
   publish-web-app:
