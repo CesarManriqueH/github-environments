@@ -1,0 +1,31 @@
+name: Deploy to environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      env_name:
+        description: Target environment for deployment
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+      version:
+        description: Tag name of release candidate
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deployer.yml
+    with:
+      env_name: ${{ inputs.env_name }}
+      name_prefix: gh-envs
+      aws_role_to_assume: arn:aws:iam::168846058973:role/gh-workflow-role
+      aws_region: us-east-1
+      base_domain: cesarmanriqueh.com
+  needs: [set-env]
