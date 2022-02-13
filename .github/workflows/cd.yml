@@ -29,7 +29,7 @@ jobs:
           echo "::set-output name=name_prefix::gh-envs"
 
   deploy-base-infra:
-    uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
+    uses: ./.github/workflows/terraform-deployer.yml
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_region: ${{ needs.set-env.outputs.region }}
@@ -44,7 +44,7 @@ jobs:
     needs: set-env
 
   deploy-main-infra:
-    uses: CesarManriqueH/github-environments/.github/workflows/terraform-deployer.yml@main
+    uses: ./.github/workflows/terraform-deployer.yml
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_region: ${{ needs.set-env.outputs.region }}

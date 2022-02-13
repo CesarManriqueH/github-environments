@@ -27,7 +27,7 @@ jobs:
           echo "::set-output name=name_prefix::gh-envs"
 
   validate-base-infra:
-    uses: CesarManriqueH/github-environments/.github/workflows/terraform-validator.yml@main
+    uses: ./.github/workflows/terraform-validator.yml
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_region: ${{ needs.set-env.outputs.region }}
@@ -42,7 +42,7 @@ jobs:
     needs: [set-env]
 
   validate-main-infra:
-    uses: CesarManriqueH/github-environments/.github/workflows/terraform-validator.yml@main
+    uses: ./.github/workflows/terraform-validator.yml
     with:
       aws_role_to_assume: ${{ needs.set-env.outputs.aws_role_to_assume }}
       tf_state_region: ${{ needs.set-env.outputs.region }}
