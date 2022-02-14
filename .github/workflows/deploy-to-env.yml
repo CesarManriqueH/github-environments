@@ -24,10 +24,12 @@ jobs:
   inputs:
     runs-on: ubuntu-20.04
     outputs:
-      env_name: ${{ inputs.env_name }}
-      version: ${{ inputs.version }}
+      env_name: ${{ github.event.inputs.env_name }}
+      version: ${{ github.event.inputs.version }}
     steps:
-      - run: exit 0
+      - run:
+          echo "${{ github.event.inputs.env_name }}"
+          echo "${{ github.event.inputs.version }}"
 
   deploy:
     uses: ./.github/workflows/_deployer.yml
