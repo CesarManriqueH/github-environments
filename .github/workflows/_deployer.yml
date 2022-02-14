@@ -1,0 +1,125 @@
+name: Deployer
+
+on:
+  workflow_call:
+    inputs:
+      env_name:
+        description: Target environment for deployment
+        required: true
+        type: string
+      name_prefix:
+        description: Name prefix to make resource names different between different deployments
+        required: true
+        type: string
+      aws_role_to_assume:
+        description: Role to assume and deploy resources to aws
+        required: true
+        type: string
+      aws_region:
+        description: AWS region to deploy resources in
+        required: true
+        type: string
+      base_domain:
+        description: Base domain to use for services with external access
+        required: true
+        type: string
+
+  deploy-base-infra:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Deploy terraform
+        uses: ./.github/actions/terraform-deployer
+        with:
+          aws_role_to_assume: ${{ inputs.aws_role_to_assume }}
+          tf_state_region: ${{ inputs.aws_region }}
+          tf_state_bucket: gh-envs-tf-state
+          tf_state_dynamodb_table: gh-envs-tf-lock
+          tf_workspace: base-dev
+          tf_target_dir: infra/base
+          tf_vars: |
+            env_name = "${{ inputs.env_name }}"
+            region = "${{ inputs.aws_region }}"
+            base_domain = "${{ inputs.base_domain }}"
+
+  deploy-main-infra:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Deploy terraform
+        uses: ./.github/actions/terraform-deployer
+        with:
+          aws_role_to_assume: ${{ inputs.aws_role_to_assume }}
+          tf_state_region: ${{ inputs.aws_region }}
+          tf_state_bucket: gh-envs-tf-state
+          tf_state_dynamodb_table: gh-envs-tf-lock
+          tf_workspace: main-dev
+          tf_target_dir: infra/main
+          tf_vars: |
+            env_name = "${{ inputs.env_name }}"
+            region = "${{ inputs.aws_region }}"
+            name_prefix = "${{ inputs.name_prefix }}"
+            base_domain = "${{ inputs.base_domain }}"
+    needs: [deploy-base-infra]
+
+  publish-web-app:
+    runs-on: ubuntu-20.04
+    env:
+      BUCKET_NAME: '${{ inputs.name_prefix }}-${{ inputs.env_name }}-web-app'
+      DOMAIN: 'web-app.${{ inputs.env_name }}.${{ inputs.base_domain }}'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build app
+        uses: ./.github/actions/build-nextjs-app
+        with:
+          path: web-app
+
+      - name: Push artifact to github
+        uses: actions/upload-artifact@v2
+        with:
+          name: web-app
+          path: web-app/out
+
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: ${{ inputs.aws_role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Lookup CF Dist ID
+        env:
+          ORIGIN_DOMAIN_NAME: "${{ env.BUCKET_NAME }}.s3.amazonaws.com"
+        run: |
+          CF_DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[].{Id: Id, OriginDomainName: Origins.Items[0].DomainName}[?contains(OriginDomainName, '${ORIGIN_DOMAIN_NAME}')] | [0].Id" \
+            --output text)
+          echo "💡 Cloudfront Distribution found with ID: ${CF_DIST_ID}"
+          echo "CF_DIST_ID=${CF_DIST_ID}" >> $GITHUB_ENV
+
+      - name: Push artifacts to s3
+        working-directory: web-app
+        run: |
+          aws s3 sync out s3://${BUCKET_NAME}/assets --delete --cache-control "max-age=900"
+          aws cloudfront create-invalidation --distribution-id ${CF_DIST_ID} --paths "/*"
+    needs: [deploy-main-infra]
+
+  smoke-test:
+    runs-on: ubuntu-20.04
+    env:
+      DOMAIN: 'web-app.${{ inputs.env_name }}.${{ inputs.base_domain }}'
+    steps:
+      - name: Confirm web page loads
+        run: |
+          url=https://${DOMAIN}
+          response=$(curl --write-out '%{http_code}' --silent --output /dev/null $url)
+          if [[ $response != "200" ]]; then
+            echo "Expected 200 from $url but got $response"
+            exit 1
+          fi
+    needs: [publish-web-app]
