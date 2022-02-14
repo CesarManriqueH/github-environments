@@ -14,18 +14,28 @@ on:
         description: Tag name of release candidate
         required: true
         type: string
+        default: main
 
 permissions:
   id-token: write
   contents: write
 
 jobs:
+  inputs:
+    runs-on: ubuntu-20.04
+    outputs:
+      env_name: ${{ inputs.env_name }}
+      version: ${{ inputs.version }}
+    steps:
+      - run: exit 0
+
   deploy:
     uses: ./.github/workflows/_deployer.yml
+    needs: [inputs]
     with:
-      env_name: ${{ inputs.env_name }}
+      env_name: ${{ needs.inputs.outputs.env_name }}
+      version: ${{ needs.inputs.outputs.version }}
       name_prefix: gh-envs
       aws_role_to_assume: arn:aws:iam::168846058973:role/gh-workflow-role
       aws_region: us-east-1
       base_domain: cesarmanriqueh.com
-  needs: [set-env]

@@ -7,6 +7,10 @@ on:
         description: Target environment for deployment
         required: true
         type: string
+      version:
+        description: Tag name of release candidate
+        type: string
+        default: main
       name_prefix:
         description: Name prefix to make resource names different between different deployments
         required: true
@@ -30,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.version }}
 
       - name: Deploy terraform
         uses: ./.github/actions/terraform-deployer
