@@ -98,7 +98,7 @@ jobs:
     needs: [changes,deploy-base-infra]
 
   publish-web-app:
-    if: ${{ needs.changes.outputs.web-app == 'true' }}
+    if: ${{ always() && needs.changes.outputs.web-app == 'true' }}
     runs-on: ubuntu-20.04
     env:
       BUCKET_NAME: '${{ inputs.name_prefix }}-${{ inputs.env_name }}-web-app'
