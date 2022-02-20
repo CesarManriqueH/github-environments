@@ -29,16 +29,30 @@ on:
         type: string
 
 jobs:
-  set-env:
-    runs-on: ubuntu-20.04
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      base-infra: ${{ steps.filter.outputs.base-infra }}
+      main-infra: ${{ steps.filter.outputs.main-infra }}
+      web-app: ${{ steps.filter.outputs.web-app }}
     steps:
-      - name: Set job level environment
-        id: set-env
-        run: |
-          exit 0
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            base-infra:
+              - 'infra/base/**'
+            main-infra:
+              - 'infra/main/**'
+            web-app:
+              - 'web-app/**'
 
   deploy-base-infra:
     runs-on: ubuntu-20.04
+    if: ${{ needs.changes.outputs.base-infra == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -58,9 +72,10 @@ jobs:
             env_name = "${{ inputs.env_name }}"
             region = "${{ inputs.aws_region }}"
             base_domain = "${{ inputs.base_domain }}"
-    needs: [set-env]
+    needs: [changes]
 
   deploy-main-infra:
+    if: ${{ needs.changes.outputs.base-infra == 'true' || needs.changes.outputs.main-infra == 'true' }}
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
@@ -80,9 +95,10 @@ jobs:
             region = "${{ inputs.aws_region }}"
             name_prefix = "${{ inputs.name_prefix }}"
             base_domain = "${{ inputs.base_domain }}"
-    needs: [set-env,deploy-base-infra]
+    needs: [changes,deploy-base-infra]
 
   publish-web-app:
+    if: ${{ needs.changes.outputs.web-app == 'true' }}
     runs-on: ubuntu-20.04
     env:
       BUCKET_NAME: '${{ inputs.name_prefix }}-${{ inputs.env_name }}-web-app'
@@ -122,10 +138,11 @@ jobs:
         run: |
           aws s3 sync out s3://${BUCKET_NAME}/assets --delete --cache-control "max-age=900"
           aws cloudfront create-invalidation --distribution-id ${CF_DIST_ID} --paths "/*"
-    needs: [set-env,deploy-main-infra]
+    needs: [changes,deploy-main-infra]
 
   smoke-test:
     runs-on: ubuntu-20.04
+    if: ${{ always() }}
     env:
       DOMAIN: 'web-app.${{ inputs.env_name }}.${{ inputs.base_domain }}'
     steps:
@@ -137,4 +154,4 @@ jobs:
             echo "Expected 200 from $url but got $response"
             exit 1
           fi
-    needs: [set-env,publish-web-app]
+    needs: [changes,publish-web-app]
