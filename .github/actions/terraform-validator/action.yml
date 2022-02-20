@@ -5,6 +5,10 @@ inputs:
     description: Role to assume and deploy resources to aws
     required: true
     type: string
+  target_dir:
+    description: Directory holding resource definitions
+    required: true
+    type: string
   tf_state_region:
     description: Region where bucket holding the terraform state is located
     required: true
@@ -21,10 +25,6 @@ inputs:
     description: Terraform workspace
     required: true
     type: string
-  tf_target_dir:
-    description: Directory holding resource definitions
-    required: true
-    type: string
   tf_vars:
     description: Content of auto.tfvars file to load on terraform plan
     required: false
@@ -33,9 +33,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
     - name: Configure aws credentials
       uses: aws-actions/configure-aws-credentials@master
       with:
@@ -63,7 +60,7 @@ runs:
       shell: bash
       run: |
         mkdir -p "${GITHUB_WORKSPACE}/target"
-        cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules ${GITHUB_WORKSPACE}/target
+        cp -R ${{ inputs.target_dir }}/*.tf ${{ inputs.target_dir }}/modules ${GITHUB_WORKSPACE}/target
 
     - uses: hashicorp/setup-terraform@v1.2.1
       with:
@@ -79,7 +76,7 @@ runs:
       run: |
         terraform init -backend-config="region=${{ inputs.tf_state_region }}" \
           -backend-config="bucket=${{ inputs.tf_state_bucket }}" \
-          -backend-config="key=${{ inputs.tf_workspace }}.json" \
+          -backend-config="key=${{ inputs.tf_workspace }}.json"
           -backend-config="dynamodb_table=${{ inputs.tf_state_dynamodb_table }}"
         terraform workspace new "${{ inputs.tf_workspace }}" &> /dev/null || terraform workspace select "${{ inputs.tf_workspace }}"
 

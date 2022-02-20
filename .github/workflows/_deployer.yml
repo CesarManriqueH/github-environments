@@ -49,11 +49,11 @@ jobs:
         uses: ./.github/actions/terraform-deployer
         with:
           aws_role_to_assume: ${{ inputs.aws_role_to_assume }}
+          target_dir: infra/base
           tf_state_region: ${{ inputs.aws_region }}
           tf_state_bucket: gh-envs-tf-state
           tf_state_dynamodb_table: gh-envs-tf-lock
           tf_workspace: base-${{ inputs.env_name }}
-          tf_target_dir: infra/base
           tf_vars: |
             env_name = "${{ inputs.env_name }}"
             region = "${{ inputs.aws_region }}"
@@ -70,11 +70,11 @@ jobs:
         uses: ./.github/actions/terraform-deployer
         with:
           aws_role_to_assume: ${{ inputs.aws_role_to_assume }}
+          target_dir: infra/main
           tf_state_region: ${{ inputs.aws_region }}
           tf_state_bucket: gh-envs-tf-state
           tf_state_dynamodb_table: gh-envs-tf-lock
           tf_workspace: main-${{ inputs.env_name }}
-          tf_target_dir: infra/main
           tf_vars: |
             env_name = "${{ inputs.env_name }}"
             region = "${{ inputs.aws_region }}"

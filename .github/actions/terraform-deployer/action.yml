@@ -5,6 +5,10 @@ inputs:
     description: Role to assume and deploy resources to aws
     required: true
     type: string
+  target_dir:
+    description: Directory holding resource definitions
+    required: true
+    type: string
   tf_state_region:
     description: Region where bucket holding the terraform state is located
     required: true
@@ -19,10 +23,6 @@ inputs:
     type: string
   tf_workspace:
     description: Terraform workspace
-    required: true
-    type: string
-  tf_target_dir:
-    description: Directory holding resource definitions
     required: true
     type: string
   tf_vars:
@@ -60,7 +60,7 @@ runs:
       shell: bash
       run: |
         mkdir -p "${GITHUB_WORKSPACE}/target"
-        cp -R ${{ inputs.tf_target_dir }}/*.tf ${{ inputs.tf_target_dir }}/modules ${GITHUB_WORKSPACE}/target
+        cp -R ${{ inputs.target_dir }}/*.tf ${{ inputs.target_dir }}/modules ${GITHUB_WORKSPACE}/target
 
     - uses: hashicorp/setup-terraform@v1.2.1
       with:
