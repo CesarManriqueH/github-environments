@@ -5,6 +5,6 @@ data "aws_route53_zone" "my_zone_id" {
 
 module "web_app_cert" {
   source      = "./modules/acm-cert"
-  domain_name = local.env_domain_name
+  domain_name = "web-app.${local.env_domain_name}"
   zone_id     = data.aws_route53_zone.my_zone_id.zone_id
 }

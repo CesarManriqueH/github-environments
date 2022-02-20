@@ -29,6 +29,14 @@ on:
         type: string
 
 jobs:
+  set-env:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Set job level environment
+        id: set-env
+        run: |
+          exit 0
+
   deploy-base-infra:
     runs-on: ubuntu-20.04
     steps:
@@ -50,6 +58,7 @@ jobs:
             env_name = "${{ inputs.env_name }}"
             region = "${{ inputs.aws_region }}"
             base_domain = "${{ inputs.base_domain }}"
+    needs: [set-env]
 
   deploy-main-infra:
     runs-on: ubuntu-20.04
@@ -71,13 +80,12 @@ jobs:
             region = "${{ inputs.aws_region }}"
             name_prefix = "${{ inputs.name_prefix }}"
             base_domain = "${{ inputs.base_domain }}"
-    needs: [deploy-base-infra]
+    needs: [set-env,deploy-base-infra]
 
   publish-web-app:
     runs-on: ubuntu-20.04
     env:
       BUCKET_NAME: '${{ inputs.name_prefix }}-${{ inputs.env_name }}-web-app'
-      DOMAIN: 'web-app.${{ inputs.env_name }}.${{ inputs.base_domain }}'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -114,7 +122,7 @@ jobs:
         run: |
           aws s3 sync out s3://${BUCKET_NAME}/assets --delete --cache-control "max-age=900"
           aws cloudfront create-invalidation --distribution-id ${CF_DIST_ID} --paths "/*"
-    needs: [deploy-main-infra]
+    needs: [set-env,deploy-main-infra]
 
   smoke-test:
     runs-on: ubuntu-20.04
@@ -129,4 +137,4 @@ jobs:
             echo "Expected 200 from $url but got $response"
             exit 1
           fi
-    needs: [publish-web-app]
+    needs: [set-env,publish-web-app]
