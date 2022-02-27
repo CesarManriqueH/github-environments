@@ -21,22 +21,11 @@ permissions:
   contents: write
 
 jobs:
-  inputs:
-    runs-on: ubuntu-20.04
-    outputs:
-      env_name: ${{ github.event.inputs.env_name }}
-      version: ${{ github.event.inputs.version }}
-    steps:
-      - run:
-          echo "${{ github.event.inputs.env_name }}"
-          echo "${{ github.event.inputs.version }}"
-
   deploy:
     uses: ./.github/workflows/_deployer.yml
-    needs: [inputs]
     with:
-      env_name: ${{ needs.inputs.outputs.env_name }}
-      version: ${{ needs.inputs.outputs.version }}
+      env_name: ${{ github.event.inputs.env_name }}
+      version: ${{ github.event.inputs.version }}
       name_prefix: gh-envs
       aws_role_to_assume: arn:aws:iam::168846058973:role/gh-workflow-role
       aws_region: us-east-1
